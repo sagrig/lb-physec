@@ -2,9 +2,12 @@ import numpy as np
 
 NUM_TRIALS = 10000
 
-# TODO: try and compare different values of sigma instead of fixed
-SIGMA_BOB  = 0.2   # Bob noise
-SIGMA_EVE  = 0.4   # Eve noise std
+# start value for Bob's sigma
+SIGMA_BOB_START      = 0.2
+SIGMA_START_DIFF     = 0.1
+SIGMA_ACCUM          = 0.05
+SIGMA_ACCUM_NUM      = 3
+SIGMA_BOB_START_MAX  = 0.3
 
 rng = np.random.default_rng()
 
@@ -37,7 +40,7 @@ def coset_decode(y) -> tuple[tuple[int, int], np.ndarray]:
     msg_hat = tuple((z_hat % 2).astype(int))
     return msg_hat, z_hat
 
-def simulate(num_trials, sigma_bob, sigma_eve) -> tuple[float, float]:
+def __simulate(num_trials, sigma_bob, sigma_eve) -> tuple[float, float]:
     bob_correct = 0
     eve_correct = 0
 
@@ -61,14 +64,33 @@ def simulate(num_trials, sigma_bob, sigma_eve) -> tuple[float, float]:
 
     return bob_rate, eve_rate
 
+def simulate(
+        num_trials,
+        bob_start,
+        start_diff,
+        accum,
+        accum_num,
+        bob_start_max
+):
+    while bob_start < bob_start_max:
+        eve_start      = bob_start + start_diff
+        eve_start_max  = eve_start + (float(accum_num) * accum)
+
+        while eve_start < eve_start_max:
+            bob_rate, eve_rate = __simulate(num_trials, bob_start, eve_start)
+            print(f"-- REPORT BOB SIGMA {bob_start:.2f}; EVE SIGMA: {eve_start:.2f}")
+            print(f"Bob rate:  {bob_rate:.2f}")
+            print(f"Eve rate:  {eve_rate:.2f}\n")
+            eve_start += accum
+        bob_start     += accum
+    return 0, 0
 
 if __name__ == "__main__":
-    bob_rate, eve_rate = simulate(NUM_TRIALS, SIGMA_BOB, SIGMA_EVE)
-
-    print("Basic lattice wiretap simulation")
-    print(f"Trials:                          {NUM_TRIALS}")
-    print(f"Bob sigma:                       {SIGMA_BOB}")
-    print(f"Eve sigma:                       {SIGMA_EVE}")
-    print(f"Bob correct coset decoding rate: {bob_rate:.4f}")
-    print(f"Eve correct coset decoding rate: {eve_rate:.4f}")
+    bob_rate, eve_rate = simulate(
+        NUM_TRIALS,
+        SIGMA_BOB_START,
+        SIGMA_START_DIFF,
+        SIGMA_ACCUM,
+        SIGMA_ACCUM_NUM,
+        SIGMA_BOB_START_MAX)
     exit(0)
