@@ -1,9 +1,81 @@
+import os
+import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 
-#####################################################################
-# PRE-SIMULATION CONSTANTS:
-# HAMMING_G – generator matrix of Hamming (8, 4, 4) code
-#####################################################################
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+matplotlib.use("Agg")
+
+SIGMA_BOB=0.4
+SIGMA_EVE=0.5
+SIGMA_STEP=0.05
+SIGMA_MAX_STEPS=20
+SIGM_MAXEVE=SIGMA_EVE + SIGMA_STEP * SIGMA_MAX_STEPS
+PLOT_DIR="plots"
+EVE_COLOR="#0f766e"
+BOB_COLOR="#e76f51"
+FIG_COLOR="#f8fafc"
+AX_COLOR="#ffffff"
+GRID_COLOR="#cbd5e1"
+
+K=[2, 4]
+N=10000
+RNG=np.random.default_rng()
+
+# --- Z/kZ functionality ---
+def sample_msg(ZkZ_msg_set):    
+    rand_idx = np.random.randint(len(ZkZ_msg_set))
+    return ZkZ_msg_set[rand_idx]
+
+def sample_randvec(tuple_size):
+    # limit here is a constant, although maybe need to be random?    
+    limit    = 100
+    rand_int = np.random.randint(-limit, limit, size=tuple_size)
+    return rand_int
+
+def sample_noise(x, sigma):
+    noise = RNG.normal(0.0, sigma, size=x.shape)
+    return noise
+
+def bob_zkz_decode(yB, k, ZkZ_msg_set):
+
+
+    best_m = None
+    best_d = float("inf")
+
+    for m in ZkZ_msg_set:
+        m = np.array(m)
+        x_hat = m + k * np.rint((yB - m) / k)
+        d = np.linalg.norm(yB - x_hat)
+        if d < best_d:
+            best_d = d
+            best_m = m
+
+    return best_m
+
+# Eve's decode algorithm:
+# 1) yE_norm = obtain norm from yE noisy vector
+# 2) for every possible message in Z/kZ, perform the same normalisation
+# 3) find the closest normalised Z/kZ coset to yE_norm
+# 4) best_m = message associated with the corresponding closest coset is the one to return
+def eve_zkz_decode(yE, k, ZkZ_msg_set):
+    yE_norm = yE / k
+
+    best_m = None
+    best_d = float("inf")
+
+    for m in ZkZ_msg_set:
+        shift = np.array(m) / k
+        nearest_int = np.rint(yE_norm - shift)
+        d = np.linalg.norm((yE_norm - shift) - nearest_int)
+
+        if d < best_d:
+            best_d = d
+            best_m = m
+
+    return best_m
+
+# --- E8 functionality ---
 HAMMING_G = np.array([
     [1, 0, 0, 0, 0, 1, 1, 1],
     [0, 1, 0, 0, 1, 0, 1, 1],
@@ -11,11 +83,6 @@ HAMMING_G = np.array([
     [0, 0, 0, 1, 1, 1, 1, 0],
 ], dtype=int)
 
-#####################################################################
-# HELPER FUNCTIONS FOR CONSTANT DEFINITIONS
-# all_hamming_codewords() – return all 2^4 = 16 codewords of the
-#                           Hamming (8, 4, 4) code each of length 8
-#####################################################################
 def all_hamming_codewords() -> np.ndarray:
     codewords = []
     for i in range(16):
@@ -24,194 +91,247 @@ def all_hamming_codewords() -> np.ndarray:
         codewords.append(cw)
     return np.array(codewords, dtype=int)
 
-######################################################################
-# SIMULATION CONSTANTS:
-#
-# NUM_TRIALS           – number of Monte Carlo simulation trials
-# SIGMA_BOB_START      - initial Bob noise standard deviation
-# SIGMA_START_DIFF     - initial offset between Bob and Eve sigmas
-# SIGMA_ACCUM          - sigma step used in the simulation loops
-# SIGMA_ACCUM_NUM      - number of sigma increments tested for each
-#                        Bob sigma
-# SIGMA_BOB_START_MAX  - upper bound for Bob sigma in the
-#                        outer simulation loop
-# K_VALUES             - list of tested k values
-# RAND_RANGE           - max. random coefficient used to choose coset
-# E8_HAMMING_BASIS     - basis matrix for sqrt(2) E8
-# E8_HAMMING_BASIS_INV - inverse of E8_HAMMING_BASIS for recovering
-#                        integer coeffs after decode
-# HAMMING_CODEWORDS    – all 16 binary codewords of (8, 4, 4) obtained
-#                        from all_hamming_codewords()
-#####################################################################
-NUM_TRIALS           = 10000 
-SIGMA_BOB_START      = 0.2
-SIGMA_START_DIFF     = 0.1
-SIGMA_ACCUM          = 0.10
-SIGMA_ACCUM_NUM      = 2
-SIGMA_BOB_START_MAX  = 0.4
-K_VALUES             = [2, 4, 8]
-RAND_RANGE           = 2
-E8_HAMMING_BASIS     = np.vstack([
-    HAMMING_G,
-    2 * np.eye(8, dtype=int)[4:]
-]).astype(float)
-E8_HAMMING_BASIS_INV = np.linalg.inv(E8_HAMMING_BASIS)
-HAMMING_CODEWORDS    = all_hamming_codewords()
-SQRT2                = np.sqrt(2.0)
-RNG                  = np.random.default_rng()
-
-del HAMMING_G
+ALL_E8_MSG_SET=all_hamming_codewords()
 del all_hamming_codewords
 
-def lattice_dim(lattice="z2"):
-    if lattice == "e8":
-        return 8
-    return 2
+def sample_e8_msg(E8_msg_set):
+    idx = np.random.randint(len(E8_msg_set))
+    return E8_msg_set[idx]
 
-def make_scales(k, dim) -> np.ndarray:
-    exponents = np.zeros(dim, dtype=int)
+def bob_e8_decode(yB, k, E8_msg_set):
+    best_m = None
+    best_d = float("inf")
 
-    for i in range(k):
-        exponents[i % dim] += 1
+    for m in E8_msg_set:
+        m = np.array(m)
+        x_hat = m + k * np.rint((yB - m) / k)
+        d = np.linalg.norm(yB - x_hat)
+        if d < best_d:
+            best_d = d
+            best_m = m
+    return best_m
 
-    return (2 ** exponents).astype(int)
+def eve_e8_decode(yE, k, E8_msg_set):
+    yE_norm = yE / k
 
-def rnd_msg(lattice="z2", k=2):
-    dim    = lattice_dim(lattice)
-    scales = make_scales(k, dim)
+    best_m = None
+    best_d = float("inf")
 
-    msg = [RNG.integers(0, scales[i]) for i in range(dim)]
-    return tuple(msg)
+    for m in E8_msg_set:
+        shift = np.array(m) / k
+        nearest_int = np.rint(yE_norm - shift)
+        d = np.linalg.norm((yE_norm - shift) - nearest_int)
 
-def encode(msg, lattice="z2", k=2, rand_range=2) -> np.ndarray:
-    dim    = lattice_dim(lattice)
-    scales = make_scales(k, dim)
-
-    m = np.array(msg, dtype=int)
-    r = RNG.integers(-rand_range, rand_range + 1, size=dim)
-
-    coeff = m + scales * r
-
-    if lattice == "e8":
-        x = (coeff @ E8_HAMMING_BASIS) / SQRT2
-        return x.astype(float)
-
-    return coeff.astype(float)
-
-def awgn_channel(x, sigma) -> np.ndarray:
-    noise = RNG.normal(0.0, sigma, size=x.shape)
-    return x + noise
-
-def nearest_z2_point(y) -> np.ndarray:
-    return np.rint(y).astype(int)
-
-def nearest_e8_point(y) -> np.ndarray:
-    target = SQRT2 * y
-
-    best_u    = None
-    best_dist = np.inf
-
-    for c in HAMMING_CODEWORDS:
-        z = np.rint((target - c) / 2.0).astype(int)
-        u = 2 * z + c
-
-        dist = np.sum((target - u) ** 2)
-        if dist < best_dist:
-            best_dist = dist
-            best_u    = u
-    return best_u.astype(float) / SQRT2
-
-
-def coset_decode(y, lattice="z2", k=2):
-    dim    = lattice_dim(lattice)
-    scales = make_scales(k, dim)
-
-    if lattice == "e8":
-        z_hat = nearest_e8_point(y)
-        u_hat = np.rint(SQRT2 * z_hat).astype(int)
-
-        coeff_hat = np.rint(u_hat @ E8_HAMMING_BASIS_INV).astype(int)
-
-        msg_hat = tuple((coeff_hat % scales).astype(int))
-        return msg_hat, z_hat
-
-    z_hat   = nearest_z2_point(y)
-    msg_hat = tuple((z_hat % scales).astype(int))
-    return msg_hat, z_hat
-
-
-def __simulate(num_trials, sigma_bob, sigma_eve, lattice="z2", k=2, rand_range=2) -> tuple[float, float]:
-    bob_correct = 0
-    eve_correct = 0
-
-    for _ in range(num_trials):
-        msg = rnd_msg(lattice=lattice, k=k)
-        x   = encode(msg, lattice=lattice, k=k, rand_range=rand_range)
-
-        y_bob = awgn_channel(x, sigma_bob)
-        y_eve = awgn_channel(x, sigma_eve)
-
-        bob_msg_hat, _ = coset_decode(y_bob, lattice=lattice, k=k)
-        eve_msg_hat, _ = coset_decode(y_eve, lattice=lattice, k=k)
-
-        if bob_msg_hat == msg:
-            bob_correct += 1
-        if eve_msg_hat == msg:
-            eve_correct += 1
-
-    bob_rate = bob_correct / num_trials
-    eve_rate = eve_correct / num_trials
-
-    return bob_rate, eve_rate
+        if d < best_d:
+            best_d = d
+            best_m = m
+    return best_m
 
 
 def simulate(
-        num_trials,
-        bob_sigma,
-        start_diff,
-        accum,
-        accum_num,
-        bob_start_max,
-        k_values,
-        rand_range
+        title,
+        k,
+        bob_msg_set,
+        eve_msg_set,
+        sample_msg_fn,
+        bob_decode_fn,
+        eve_decode_fn
 ):
-    lattices = ["z2", "e8"]
+    b_total = 0
+    e_rates = []
+    for step in range(SIGMA_MAX_STEPS):
+        sigma_eve = SIGMA_EVE + (step * SIGMA_STEP)
+        b_corr = 0
+        e_corr = 0
 
-    while bob_sigma < bob_start_max:
-        eve_sigma      = bob_sigma + start_diff
-        eve_start_max  = eve_sigma + (float(accum_num) * accum)
+        for i in range(N):
+            m = sample_msg_fn(bob_msg_set)
+            z = sample_randvec(len(m))
+            x = m + (k * z)
 
-        while eve_sigma < eve_start_max:
-            print(f"--- REPORT BOB SIGMA {bob_sigma:.2f}; EVE SIGMA: {eve_sigma:.2f}")
+            eB = sample_noise(x, SIGMA_BOB)
+            eE = sample_noise(x, sigma_eve)
 
-            for lattice in lattices:
-                for k in k_values:
-                    bob_rate, eve_rate = __simulate(
-                        num_trials,
-                        bob_sigma,
-                        eve_sigma,
-                        lattice=lattice,
-                        k=k,
-                        rand_range=rand_range
-                    )
-                    print(f"-- Lattice {lattice}; k: {k}")
-                    print(f"Bob rate:  {bob_rate:.2f}")
-                    print(f"Eve rate:  {eve_rate:.2f}\n")
+            yB = x + eB
+            yE = x + eE
 
-            eve_sigma += accum
-        bob_sigma += accum
-        print("-------------------------------------------")
+            mB = bob_decode_fn(yB, k, bob_msg_set)
+            mE = eve_decode_fn(yE, k, eve_msg_set)
 
+            b_corr = b_corr + np.array_equal(m, mB)
+            e_corr = e_corr + np.array_equal(m, mE)
 
-if __name__ == "__main__":
-    simulate(
-        NUM_TRIALS,
-        SIGMA_BOB_START,
-        SIGMA_START_DIFF,
-        SIGMA_ACCUM,
-        SIGMA_ACCUM_NUM,
-        SIGMA_BOB_START_MAX,
-        K_VALUES,
-        RAND_RANGE
+        b_rate   = (b_corr / N) * 100
+        e_rate   = (e_corr / N) * 100
+        b_total  = b_total + b_rate
+        e_rates.append(e_rate)
+
+        print(f"-- Monte Carlo simulation results for {title} --")
+        print(f"-- Eve Sigma {sigma_eve:.2f} --")
+        print(f"Bob success rate       {b_corr}/{N} ({b_rate:.2f}%)")
+        print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
+        print()
+        print('===================================================================\n')
+    b_avg = b_total / SIGMA_MAX_STEPS
+    return b_avg, e_rates
+
+# Variable Legend
+# m  - randomly sampled message from available Z/kZ set
+# x  - the encoded msg by Alice
+# eB - Bob's Gaussian noise vector
+# eE - Eve's Gaussian noise vector
+# yB - Bob's received message with noise
+# yE - Eve's received message with noise
+# mB - Bob's decoded message
+# mE - Eve's decoded message
+if __name__ == "__main__":    
+    os.makedirs(PLOT_DIR, exist_ok=True)
+    sigma_values = [round(SIGMA_EVE + (step * SIGMA_STEP), 2) for step in range(SIGMA_MAX_STEPS)]
+    simulation_results = []
+
+    #### Z/2Z implementation ####
+    Z2Z_msg_set = [(a, b) for a in range(2) for b in range(2)]
+    b_avg, e_rates = simulate(
+        title         = "Z/2Z",
+        k             = 2,
+        bob_msg_set   = Z2Z_msg_set,
+        eve_msg_set   = Z2Z_msg_set,
+        sample_msg_fn = sample_msg,
+        bob_decode_fn = bob_zkz_decode,
+        eve_decode_fn = eve_zkz_decode
     )
+    simulation_results.append(("Z/2Z", "z2z.png", b_avg, e_rates))
+
+    #### Z/4Z implementation ####
+    Z4Z_msg_set = [(a, b) for a in range(4) for b in range(4)]
+    b_avg, e_rates = simulate(
+        title         = "Z/4Z",
+        k             = 4,
+        bob_msg_set   = Z4Z_msg_set,
+        eve_msg_set   = Z4Z_msg_set,
+        sample_msg_fn = sample_msg,
+        bob_decode_fn = bob_zkz_decode,
+        eve_decode_fn = eve_zkz_decode
+    )
+    simulation_results.append(("Z/4Z", "z4z.png", b_avg, e_rates))
+
+    #### repetitive Z/2Z implementation ####
+    rZ2Z_msg_set = [(a, a) for a in range(2)]
+    b_avg, e_rates = simulate(
+        title         = "repetitive Z/2Z",
+        k             = 2,
+        bob_msg_set   = rZ2Z_msg_set,
+        eve_msg_set   = rZ2Z_msg_set,
+        sample_msg_fn = sample_msg,
+        bob_decode_fn = bob_zkz_decode,
+        eve_decode_fn = eve_zkz_decode
+    )
+    simulation_results.append(("repetitive Z/2Z", "repetitive_z2z.png", b_avg, e_rates))
+
+    #### repetitive Z/4Z implementation ####
+    rZ4Z_msg_set = [(a, a) for a in range(4)]
+    b_avg, e_rates = simulate(
+        title         = "repetitive Z/4Z",
+        k             = 4,
+        bob_msg_set   = rZ4Z_msg_set,
+        eve_msg_set   = rZ4Z_msg_set,
+        sample_msg_fn = sample_msg,
+        bob_decode_fn = bob_zkz_decode,
+        eve_decode_fn = eve_zkz_decode
+    )
+    simulation_results.append(("repetitive Z/4Z", "repetitive_z4z.png", b_avg, e_rates))
+    #### E8 implementation ####
+    b_avg, e_rates = simulate(
+        title         = "E8",
+        k             = 2,
+        bob_msg_set   = ALL_E8_MSG_SET,
+        eve_msg_set   = ALL_E8_MSG_SET,
+        sample_msg_fn = sample_e8_msg,
+        bob_decode_fn = bob_e8_decode,
+        eve_decode_fn = eve_e8_decode
+    )
+    simulation_results.append(("E8", "e8.png", b_avg, e_rates))
+
+    #### repetitive E8 implementation ####
+    REPET_E8_MSG_SET = [
+        [0] * 8,
+        [1] * 8,
+    ]
+    
+    b_avg, e_rates = simulate(
+        title         = "repetitive E8",
+        k             = 2,
+        bob_msg_set   = REPET_E8_MSG_SET,
+        eve_msg_set   = REPET_E8_MSG_SET,
+        sample_msg_fn = sample_e8_msg,
+        bob_decode_fn = bob_e8_decode,
+        eve_decode_fn = eve_e8_decode
+    )
+    simulation_results.append(("repetitive E8", "repetitive_e8.png", b_avg, e_rates))
+
+    #### doubly-even E8 implementation ####
+    DEVEN_E8_MSG_SET=[
+        [0] * 8,
+        [1] * 8,
+        [1] * 4 + [0] * 4,
+        [0] * 4 + [1] * 4
+    ]
+
+    b_avg, e_rates = simulate(
+        title         = "doubly-even E8",
+        k             = 2,
+        bob_msg_set   = DEVEN_E8_MSG_SET,
+        eve_msg_set   = DEVEN_E8_MSG_SET,
+        sample_msg_fn = sample_e8_msg,
+        bob_decode_fn = bob_e8_decode,
+        eve_decode_fn = eve_e8_decode
+    )
+    simulation_results.append(("doubly-even E8", "doubly_even_e8.png", b_avg, e_rates))
+
+    #### Bob is E8, Eve is repetitive E8
+    b_avg, e_rates = simulate(
+        title         = "Bob is E8 and Eve is repetitive E8",
+        k             = 2,
+        bob_msg_set   = ALL_E8_MSG_SET,
+        eve_msg_set   = REPET_E8_MSG_SET,
+        sample_msg_fn = sample_e8_msg,
+        bob_decode_fn = bob_e8_decode,
+        eve_decode_fn = eve_e8_decode
+    )
+    simulation_results.append(("Bob is E8 and Eve is repetitive E8", "bob_e8_eve_repetitive_e8.png", b_avg, e_rates))
+
+    for title, filename, b_avg, e_rates in simulation_results:
+        fig, ax = plt.subplots(figsize=(8, 5), facecolor=FIG_COLOR)
+        ax.set_facecolor(AX_COLOR)
+        ax.plot(
+            sigma_values,
+            e_rates,
+            color=EVE_COLOR,
+            marker="o",
+            markerfacecolor=AX_COLOR,
+            markeredgecolor=EVE_COLOR,
+            markeredgewidth=2,
+            linewidth=2.5,
+            label="Eve success rate"
+        )
+        ax.plot(
+            sigma_values,
+            [b_avg] * len(sigma_values),
+            color=BOB_COLOR,
+            linestyle="--",
+            linewidth=2.5,
+            label=f"Bob average ({b_avg:.2f}%)"
+        )
+        ax.set_title(title)
+        ax.set_xlabel("Eve sigma")
+        ax.set_ylabel("Success rate (%)")
+        ax.set_ylim(0, 100)
+        ax.set_xticks(sigma_values)
+        ax.tick_params(axis="x", rotation=45)
+        ax.grid(True, color=GRID_COLOR, alpha=0.7)
+        ax.legend(frameon=True, facecolor=AX_COLOR, edgecolor=GRID_COLOR)
+        fig.tight_layout()
+        fig.savefig(os.path.join(PLOT_DIR, filename), dpi=150, facecolor=FIG_COLOR)
+        plt.close()
+
     exit(0)
