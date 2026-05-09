@@ -74,12 +74,12 @@ def all_hamming_codewords() -> np.ndarray:
         codewords.append(cw)
     return np.array(codewords, dtype=int)
 
-E8_MSG_SET=all_hamming_codewords()
+ALL_E8_MSG_SET=all_hamming_codewords()
 del all_hamming_codewords
 
-def sample_e8_msg():
-    idx = np.random.randint(len(E8_MSG_SET))
-    return E8_MSG_SET[idx]
+def sample_e8_msg(E8_msg_set):
+    idx = np.random.randint(len(E8_msg_set))
+    return E8_msg_set[idx]
 
 def bob_e8_decode(yB, k, E8_msg_set):
     yB_hat = np.rint(yB).astype(int)
@@ -152,7 +152,7 @@ if __name__ == "__main__":
         print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
         print()
     print('============================================================\n')
-    # linear Z/kZ implementation
+    # repetitive Z/kZ implementation
     for k in K:        
         ZkZ_msg_set = [(a, a) for a in range(k)]
         b_corr = 0
@@ -178,18 +178,21 @@ if __name__ == "__main__":
         b_rate = (b_corr / N) * 100
         e_rate = (e_corr / N) * 100
 
-        print(f"-- Monte Carlo simulation results for linear Z/{k}Z: --")
+        print(f"-- Monte Carlo simulation results for repetitive Z/{k}Z: --")
         print(f"Bob success rate       {b_corr}/{N} ({b_rate:.2f}%)")
         print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
         print()
     print('============================================================\n')        
     # E8 implementation
+    BOB_E8_MSG_SET=ALL_E8_MSG_SET
+    EVE_E8_MSG_SET=ALL_E8_MSG_SET
+    
     for k in [2]:
         b_corr = 0
         e_corr = 0
 
         for i in range(N):
-            m = sample_e8_msg()
+            m = sample_e8_msg(BOB_E8_MSG_SET)
     
             z = sample_randvec(len(m))
             x = m + (k * z)
@@ -200,8 +203,8 @@ if __name__ == "__main__":
             yB = x + eB
             yE = x + eE
 
-            mB = bob_e8_decode(yB, k, E8_MSG_SET)
-            mE = eve_e8_decode(yE, k, E8_MSG_SET)
+            mB = bob_e8_decode(yB, k, BOB_E8_MSG_SET)
+            mE = eve_e8_decode(yE, k, EVE_E8_MSG_SET)
 
             b_corr = b_corr + np.array_equal(m, mB)
             e_corr = e_corr + np.array_equal(m, mE)
@@ -214,18 +217,21 @@ if __name__ == "__main__":
         print()
 
     print('============================================================\n')        
-    # linear E8 implementation
-    E8_MSG_SET=[
+    # repetitive E8 implementation
+    REPET_E8_MSG_SET = [
         [0] * 8,
         [1] * 8,
     ]
+    BOB_E8_MSG_SET = REPET_E8_MSG_SET
+    EVE_E8_MSG_SET = REPET_E8_MSG_SET
+    
     for k in [2]:
         b_corr = 0
         e_corr = 0
 
         for i in range(N):
-            m = sample_e8_msg()
-    
+            m = sample_e8_msg(BOB_E8_MSG_SET)
+            
             z = sample_randvec(len(m))
             x = m + (k * z)
 
@@ -235,35 +241,37 @@ if __name__ == "__main__":
             yB = x + eB
             yE = x + eE
 
-            mB = bob_e8_decode(yB, k, E8_MSG_SET)
-            mE = eve_e8_decode(yE, k, E8_MSG_SET)
+            mB = bob_e8_decode(yB, k, BOB_E8_MSG_SET)
+            mE = eve_e8_decode(yE, k, EVE_E8_MSG_SET)
 
             b_corr = b_corr + np.array_equal(m, mB)
             e_corr = e_corr + np.array_equal(m, mE)
             
         b_rate = (b_corr / N) * 100
         e_rate = (e_corr / N) * 100
-        print(f"-- Monte Carlo simulation results for linear E8 (k={k}): --")
+        print(f"-- Monte Carlo simulation results for repetitive E8 (k={k}): --")
         print(f"Bob success rate       {b_corr}/{N} ({b_rate:.2f}%)")
         print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
         print()
-
         
     print('============================================================\n')        
-    # partially linear E8 implementation
-    E8_MSG_SET=[
+    # doubly-even E8 implementation
+    DEVEN_E8_MSG_SET=[
         [0] * 8,
         [1] * 8,
         [1] * 4 + [0] * 4,
         [0] * 4 + [1] * 4
     ]
+    BOB_E8_MSG_SET = DEVEN_E8_MSG_SET
+    EVE_E8_MSG_SET = DEVEN_E8_MSG_SET
+    
     for k in [2]:
         b_corr = 0
         e_corr = 0
 
         for i in range(N):
-            m = sample_e8_msg()
-    
+            m = sample_e8_msg(BOB_E8_MSG_SET)
+            
             z = sample_randvec(len(m))
             x = m + (k * z)
 
@@ -273,15 +281,48 @@ if __name__ == "__main__":
             yB = x + eB
             yE = x + eE
 
-            mB = bob_e8_decode(yB, k, E8_MSG_SET)
-            mE = eve_e8_decode(yE, k, E8_MSG_SET)
+            mB = bob_e8_decode(yB, k, BOB_E8_MSG_SET)
+            mE = eve_e8_decode(yE, k, EVE_E8_MSG_SET)
 
             b_corr = b_corr + np.array_equal(m, mB)
             e_corr = e_corr + np.array_equal(m, mE)
             
         b_rate = (b_corr / N) * 100
         e_rate = (e_corr / N) * 100
-        print(f"-- Monte Carlo simulation results for partially linear E8 (k={k}): --")
+        print(f"-- Monte Carlo simulation results for doubly-even E8 (k={k}): --")
+        print(f"Bob success rate       {b_corr}/{N} ({b_rate:.2f}%)")
+        print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
+        print()
+
+    print('============================================================\n')        
+    # E8 for Bob, repetitive E8 for Eve
+    BOB_E8_MSG_SET = ALL_E8_MSG_SET
+    EVE_E8_MSG_SET = REPET_E8_MSG_SET
+    for k in [2]:
+        b_corr = 0
+        e_corr = 0
+
+        for i in range(N):
+            m = sample_e8_msg(BOB_E8_MSG_SET)
+            
+            z = sample_randvec(len(m))
+            x = m + (k * z)
+
+            eB = sample_noise(x, SIGMA_BOB)
+            eE = sample_noise(x, SIGMA_EVE)
+
+            yB = x + eB
+            yE = x + eE
+
+            mB = bob_e8_decode(yB, k, BOB_E8_MSG_SET)
+            mE = eve_e8_decode(yE, k, EVE_E8_MSG_SET)
+
+            b_corr = b_corr + np.array_equal(m, mB)
+            e_corr = e_corr + np.array_equal(m, mE)
+            
+        b_rate = (b_corr / N) * 100
+        e_rate = (e_corr / N) * 100
+        print(f"-- Monte Carlo simulation results for E8 for Bob and repetitive for Eve (k={k}): --")
         print(f"Bob success rate       {b_corr}/{N} ({b_rate:.2f}%)")
         print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
         print()
