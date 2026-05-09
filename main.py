@@ -200,7 +200,7 @@ if __name__ == "__main__":
         bob_decode_fn = bob_zkz_decode,
         eve_decode_fn = eve_zkz_decode
     )
-    simulation_results.append(("Z/2Z", "z2z.png", b_avg, e_rates))
+    simulation_results.append((r"$\mathbb{Z}^{2}/2\mathbb{Z}^{2}$", "z2z.png", b_avg, e_rates))
 
     #### Z/4Z implementation ####
     Z4Z_msg_set = [(a, b) for a in range(4) for b in range(4)]
@@ -213,7 +213,7 @@ if __name__ == "__main__":
         bob_decode_fn = bob_zkz_decode,
         eve_decode_fn = eve_zkz_decode
     )
-    simulation_results.append(("Z/4Z", "z4z.png", b_avg, e_rates))
+    simulation_results.append((r"$\mathbb{Z}^{2}/4\mathbb{Z}^{2}$", "z4z.png", b_avg, e_rates))
 
     #### repetitive Z/2Z implementation ####
     rZ2Z_msg_set = [(a, a) for a in range(2)]
@@ -226,7 +226,7 @@ if __name__ == "__main__":
         bob_decode_fn = bob_zkz_decode,
         eve_decode_fn = eve_zkz_decode
     )
-    simulation_results.append(("repetitive Z/2Z", "repetitive_z2z.png", b_avg, e_rates))
+    simulation_results.append((r"Repetition code in $\mathbb{Z}^{2}/2\mathbb{Z}^{2}$", "repetitive_z2z.png", b_avg, e_rates))
 
     #### repetitive Z/4Z implementation ####
     rZ4Z_msg_set = [(a, a) for a in range(4)]
@@ -239,7 +239,7 @@ if __name__ == "__main__":
         bob_decode_fn = bob_zkz_decode,
         eve_decode_fn = eve_zkz_decode
     )
-    simulation_results.append(("repetitive Z/4Z", "repetitive_z4z.png", b_avg, e_rates))
+    simulation_results.append((r"Repetition code in $\mathbb{Z}^{2}/4\mathbb{Z}^{2}$", "repetitive_z4z.png", b_avg, e_rates))
     #### E8 implementation ####
     b_avg, e_rates = simulate(
         title         = "E8",
@@ -250,7 +250,7 @@ if __name__ == "__main__":
         bob_decode_fn = bob_e8_decode,
         eve_decode_fn = eve_e8_decode
     )
-    simulation_results.append(("E8", "e8.png", b_avg, e_rates))
+    simulation_results.append((r"$\sqrt{2}E_8/2\mathbb{Z}^{8}$", "e8.png", b_avg, e_rates))
 
     #### repetitive E8 implementation ####
     REPET_E8_MSG_SET = [
@@ -267,7 +267,7 @@ if __name__ == "__main__":
         bob_decode_fn = bob_e8_decode,
         eve_decode_fn = eve_e8_decode
     )
-    simulation_results.append(("repetitive E8", "repetitive_e8.png", b_avg, e_rates))
+    simulation_results.append((r"Repetition code in $\sqrt{2}E_8/2\mathbb{Z}^{8}$", "repetitive_e8.png", b_avg, e_rates))
 
     #### doubly-even E8 implementation ####
     DEVEN_E8_MSG_SET=[
@@ -286,7 +286,7 @@ if __name__ == "__main__":
         bob_decode_fn = bob_e8_decode,
         eve_decode_fn = eve_e8_decode
     )
-    simulation_results.append(("doubly-even E8", "doubly_even_e8.png", b_avg, e_rates))
+    simulation_results.append((r"Doubly-even code in $\sqrt{2}E_8/2\mathbb{Z}^{8}$", "doubly_even_e8.png", b_avg, e_rates))
 
     #### Bob is E8, Eve is repetitive E8
     b_avg, e_rates = simulate(
@@ -298,7 +298,7 @@ if __name__ == "__main__":
         bob_decode_fn = bob_e8_decode,
         eve_decode_fn = eve_e8_decode
     )
-    simulation_results.append(("Bob is E8 and Eve is repetitive E8", "bob_e8_eve_repetitive_e8.png", b_avg, e_rates))
+    simulation_results.append((r"Bob: $\sqrt{2}E_8/2\mathbb{Z}^{8}$; Eve: repetition code", "bob_e8_eve_repetitive_e8.png", b_avg, e_rates))
 
     for title, filename, b_avg, e_rates in simulation_results:
         fig, ax = plt.subplots(figsize=(8, 5), facecolor=FIG_COLOR)
