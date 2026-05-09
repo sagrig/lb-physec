@@ -1,8 +1,12 @@
 import numpy as np
 
 SIGMA_BOB=0.4
-SIGMA_EVE=0.8
-K=[2, 3, 4]
+SIGMA_EVE=0.5
+SIGMA_STEP=0.1
+SIGMA_MAX_STEPS=5
+SIGM_MAXEVE=SIGMA_EVE + SIGMA_STEP * SIGMA_MAX_STEPS
+
+K=[2, 4]
 N=10000
 RNG=np.random.default_rng()
 
@@ -111,6 +115,49 @@ def eve_e8_decode(yE, k, E8_msg_set):
             best_m = m
     return best_m
 
+
+def simulate(
+        title,
+        k,
+        bob_msg_set,
+        eve_msg_set,
+        sample_msg_fn,
+        bob_decode_fn,
+        eve_decode_fn
+):
+    for step in range(SIGMA_MAX_STEPS):
+        sigma_eve = SIGMA_EVE + (step * SIGMA_STEP)
+        b_corr = 0
+        e_corr = 0
+
+        for i in range(N):
+            m = sample_msg_fn(bob_msg_set)
+            z = sample_randvec(len(m))
+            x = m + (k * z)
+
+            eB = sample_noise(x, SIGMA_BOB)
+            eE = sample_noise(x, sigma_eve)
+
+            yB = x + eB
+            yE = x + eE
+
+            mB = bob_decode_fn(yB, k, bob_msg_set)
+            mE = eve_decode_fn(yE, k, eve_msg_set)
+
+            b_corr = b_corr + np.array_equal(m, mB)
+            e_corr = e_corr + np.array_equal(m, mE)
+
+        b_rate = (b_corr / N) * 100
+        e_rate = (e_corr / N) * 100
+
+        print(f"-- Monte Carlo simulation results for {title} --")
+        print(f"-- Eve Sigma {sigma_eve} --")
+        print(f"Bob success rate       {b_corr}/{N} ({b_rate:.2f}%)")
+        print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
+        print()
+        print('===================================================================\n')
+            
+
 # Variable Legend
 # m  - randomly sampled message from available Z/kZ set
 # x  - the encoded msg by Alice
@@ -120,221 +167,107 @@ def eve_e8_decode(yE, k, E8_msg_set):
 # yE - Eve's received message with noise
 # mB - Bob's decoded message
 # mE - Eve's decoded message
-if __name__ == "__main__":
-    # Z/kZ implementation
-    for k in K:        
-        ZkZ_msg_set = [(a, b) for a in range(k) for b in range(k)]
-        b_corr = 0
-        e_corr  = 0
+if __name__ == "__main__":    
+    #### Z/2Z implementation ####
+    Z2Z_msg_set = [(a, b) for a in range(2) for b in range(2)]
+    simulate(
+        title         = "Z/2Z",
+        k             = 2,
+        bob_msg_set   = Z2Z_msg_set,
+        eve_msg_set   = Z2Z_msg_set,
+        sample_msg_fn = sample_msg,
+        bob_decode_fn = bob_zkz_decode,
+        eve_decode_fn = eve_zkz_decode
+    )
 
-        for i in range(N):
-            m  = sample_msg(ZkZ_msg_set)
-            z  = sample_randvec(len(m))
-            x  = m + (k * z)
+    #### Z/4Z implementation ####
+    Z4Z_msg_set = [(a, b) for a in range(4) for b in range(4)]
+    simulate(
+        title         = "Z/4Z",
+        k             = 4,
+        bob_msg_set   = Z4Z_msg_set,
+        eve_msg_set   = Z4Z_msg_set,
+        sample_msg_fn = sample_msg,
+        bob_decode_fn = bob_zkz_decode,
+        eve_decode_fn = eve_zkz_decode
+    )
 
-            eB = sample_noise(x, SIGMA_BOB)
-            eE = sample_noise(x, SIGMA_EVE)
+    #### repetitive Z/2Z implementation ####
+    rZ2Z_msg_set = [(a, a) for a in range(2)]
+    simulate(
+        title         = "repetitive Z/2Z",
+        k             = 2,
+        bob_msg_set   = rZ2Z_msg_set,
+        eve_msg_set   = rZ2Z_msg_set,
+        sample_msg_fn = sample_msg,
+        bob_decode_fn = bob_zkz_decode,
+        eve_decode_fn = eve_zkz_decode
+    )
 
-            yB = x + eB
-            yE = x + eE
+    #### repetitive Z/4Z implementation ####
+    rZ4Z_msg_set = [(a, a) for a in range(4)]
+    simulate(
+        title         = "repetitive Z/4Z",
+        k             = 4,
+        bob_msg_set   = rZ4Z_msg_set,
+        eve_msg_set   = rZ4Z_msg_set,
+        sample_msg_fn = sample_msg,
+        bob_decode_fn = bob_zkz_decode,
+        eve_decode_fn = eve_zkz_decode
+    )
+    #### E8 implementation ####
+    simulate(
+        title         = "E8",
+        k             = 2,
+        bob_msg_set   = ALL_E8_MSG_SET,
+        eve_msg_set   = ALL_E8_MSG_SET,
+        sample_msg_fn = sample_e8_msg,
+        bob_decode_fn = bob_e8_decode,
+        eve_decode_fn = eve_e8_decode
+    )
 
-            mB = bob_zkz_decode(yB, k, ZkZ_msg_set)
-            mE = eve_zkz_decode(yE, k, ZkZ_msg_set)
-
-            b_corr = b_corr + (m == mB)
-            e_corr = e_corr + (m == mE)
-
-        b_rate = (b_corr / N) * 100
-        e_rate = (e_corr / N) * 100
-
-        print(f"-- Monte Carlo simulation results for Z/{k}Z: --")
-        print(f"Bob success rate       {b_corr}/{N} ({b_rate:.2f}%)")
-        print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
-        print()
-    print('============================================================\n')
-    # repetitive Z/kZ implementation
-    for k in K:        
-        ZkZ_msg_set = [(a, a) for a in range(k)]
-        b_corr = 0
-        e_corr = 0
-
-        for i in range(N):
-            m  = sample_msg(ZkZ_msg_set)
-            z  = sample_randvec(len(m))
-            x  = m + (k * z)
-
-            eB = sample_noise(x, SIGMA_BOB)
-            eE = sample_noise(x, SIGMA_EVE)
-
-            yB = x + eB
-            yE = x + eE
-
-            mB = bob_zkz_decode(yB, k, ZkZ_msg_set)
-            mE = eve_zkz_decode(yE, k, ZkZ_msg_set)
-
-            b_corr = b_corr + (m == mB)
-            e_corr = e_corr + (m == mE)
-
-        b_rate = (b_corr / N) * 100
-        e_rate = (e_corr / N) * 100
-
-        print(f"-- Monte Carlo simulation results for repetitive Z/{k}Z: --")
-        print(f"Bob success rate       {b_corr}/{N} ({b_rate:.2f}%)")
-        print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
-        print()
-    print('============================================================\n')        
-    # E8 implementation
-    BOB_E8_MSG_SET=ALL_E8_MSG_SET
-    EVE_E8_MSG_SET=ALL_E8_MSG_SET
-    
-    for k in [2]:
-        b_corr = 0
-        e_corr = 0
-
-        for i in range(N):
-            m = sample_e8_msg(BOB_E8_MSG_SET)
-    
-            z = sample_randvec(len(m))
-            x = m + (k * z)
-
-            eB = sample_noise(x, SIGMA_BOB)
-            eE = sample_noise(x, SIGMA_EVE)
-
-            yB = x + eB
-            yE = x + eE
-
-            mB = bob_e8_decode(yB, k, BOB_E8_MSG_SET)
-            mE = eve_e8_decode(yE, k, EVE_E8_MSG_SET)
-
-            b_corr = b_corr + np.array_equal(m, mB)
-            e_corr = e_corr + np.array_equal(m, mE)
-            
-        b_rate = (b_corr / N) * 100
-        e_rate = (e_corr / N) * 100
-        print(f"-- Monte Carlo simulation results for E8 (k={k}): --")
-        print(f"Bob success rate       {b_corr}/{N} ({b_rate:.2f}%)")
-        print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
-        print()
-
-    print('============================================================\n')        
-    # repetitive E8 implementation
+    #### repetitive E8 implementation ####
     REPET_E8_MSG_SET = [
         [0] * 8,
         [1] * 8,
     ]
-    BOB_E8_MSG_SET = REPET_E8_MSG_SET
-    EVE_E8_MSG_SET = REPET_E8_MSG_SET
     
-    for k in [2]:
-        b_corr = 0
-        e_corr = 0
+    simulate(
+        title         = "repetitive E8",
+        k             = 2,
+        bob_msg_set   = REPET_E8_MSG_SET,
+        eve_msg_set   = REPET_E8_MSG_SET,
+        sample_msg_fn = sample_e8_msg,
+        bob_decode_fn = bob_e8_decode,
+        eve_decode_fn = eve_e8_decode
+    )
 
-        for i in range(N):
-            m = sample_e8_msg(BOB_E8_MSG_SET)
-            
-            z = sample_randvec(len(m))
-            x = m + (k * z)
-
-            eB = sample_noise(x, SIGMA_BOB)
-            eE = sample_noise(x, SIGMA_EVE)
-
-            yB = x + eB
-            yE = x + eE
-
-            mB = bob_e8_decode(yB, k, BOB_E8_MSG_SET)
-            mE = eve_e8_decode(yE, k, EVE_E8_MSG_SET)
-
-            b_corr = b_corr + np.array_equal(m, mB)
-            e_corr = e_corr + np.array_equal(m, mE)
-            
-        b_rate = (b_corr / N) * 100
-        e_rate = (e_corr / N) * 100
-        print(f"-- Monte Carlo simulation results for repetitive E8 (k={k}): --")
-        print(f"Bob success rate       {b_corr}/{N} ({b_rate:.2f}%)")
-        print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
-        print()
-        
-    print('============================================================\n')        
-    # doubly-even E8 implementation
+    #### doubly-even E8 implementation ####
     DEVEN_E8_MSG_SET=[
         [0] * 8,
         [1] * 8,
         [1] * 4 + [0] * 4,
         [0] * 4 + [1] * 4
     ]
-    BOB_E8_MSG_SET = DEVEN_E8_MSG_SET
-    EVE_E8_MSG_SET = DEVEN_E8_MSG_SET
-    
-    for k in [2]:
-        b_corr = 0
-        e_corr = 0
 
-        for i in range(N):
-            m = sample_e8_msg(BOB_E8_MSG_SET)
-            
-            z = sample_randvec(len(m))
-            x = m + (k * z)
+    simulate(
+        title         = "doubly-even E8",
+        k             = 2,
+        bob_msg_set   = DEVEN_E8_MSG_SET,
+        eve_msg_set   = DEVEN_E8_MSG_SET,
+        sample_msg_fn = sample_e8_msg,
+        bob_decode_fn = bob_e8_decode,
+        eve_decode_fn = eve_e8_decode
+    )
 
-            eB = sample_noise(x, SIGMA_BOB)
-            eE = sample_noise(x, SIGMA_EVE)
-
-            yB = x + eB
-            yE = x + eE
-
-            mB = bob_e8_decode(yB, k, BOB_E8_MSG_SET)
-            mE = eve_e8_decode(yE, k, EVE_E8_MSG_SET)
-
-            b_corr = b_corr + np.array_equal(m, mB)
-            e_corr = e_corr + np.array_equal(m, mE)
-            
-        b_rate = (b_corr / N) * 100
-        e_rate = (e_corr / N) * 100
-        print(f"-- Monte Carlo simulation results for doubly-even E8 (k={k}): --")
-        print(f"Bob success rate       {b_corr}/{N} ({b_rate:.2f}%)")
-        print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
-        print()
-
-    print('============================================================\n')        
-    # E8 for Bob, repetitive E8 for Eve
-    BOB_E8_MSG_SET = ALL_E8_MSG_SET
-    EVE_E8_MSG_SET = REPET_E8_MSG_SET
-    for k in [2]:
-        b_corr = 0
-        e_corr = 0
-
-        for i in range(N):
-            m = sample_e8_msg(BOB_E8_MSG_SET)
-            
-            z = sample_randvec(len(m))
-            x = m + (k * z)
-
-            eB = sample_noise(x, SIGMA_BOB)
-            eE = sample_noise(x, SIGMA_EVE)
-
-            yB = x + eB
-            yE = x + eE
-
-            mB = bob_e8_decode(yB, k, BOB_E8_MSG_SET)
-            mE = eve_e8_decode(yE, k, EVE_E8_MSG_SET)
-
-            b_corr = b_corr + np.array_equal(m, mB)
-            e_corr = e_corr + np.array_equal(m, mE)
-            
-        b_rate = (b_corr / N) * 100
-        e_rate = (e_corr / N) * 100
-        print(f"-- Monte Carlo simulation results for E8 for Bob and repetitive for Eve (k={k}): --")
-        print(f"Bob success rate       {b_corr}/{N} ({b_rate:.2f}%)")
-        print(f"Eve success rate       {e_corr}/{N} ({e_rate:.2f}%)")
-        print()
-        
-        
-    # print("-- An example of vectors in computation --")
-    # print(f"Picked message            m={m}")
-    # print(f"Random Vector             z={z}")
-    # print(f"Encoded message           x={x}")
-    # print(f"Eve Error vector          eB={eB}")    
-    # print(f"Eve Error vector          eE={eE}")
-    # print(f"Eve Error vector          eE={eB}")
-    # print(f"Eve Recv message          yE={yE}")    
-    # print(f"Eve Decode message        mE={mE}")    
+    #### Bob is E8, Eve is repetitive E8
+    simulate(
+        title         = "Bob is E8 and Eve is repetitive E8",
+        k             = 2,
+        bob_msg_set   = ALL_E8_MSG_SET,
+        eve_msg_set   = REPET_E8_MSG_SET,
+        sample_msg_fn = sample_e8_msg,
+        bob_decode_fn = bob_e8_decode,
+        eve_decode_fn = eve_e8_decode
+    )
     exit(0)
